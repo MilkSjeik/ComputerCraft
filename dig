@@ -1,0 +1,275 @@
+-- ********************
+-- * DigBranch Program
+-- * By MilkSjeik
+-- ********************
+
+-- Place normal blocks in slots 5 to 8
+-- Example: sand, stone, dirt, gravel
+
+-- *******************
+-- * Constants
+-- *******************
+DIRECTION =
+  {
+  FORWARD = 1,
+  LEFT    = 2,
+  RIGHT   = 3,
+  UP      = 4,
+  DOWN    = 5,
+  }
+
+SLOTS =
+	{
+	TORCHES = 1,
+	FUEL	= 2,
+	}
+
+BLOCKS =
+	{
+	START	= 5,
+	END		= 8,
+	}
+
+-- *******************
+-- * Script variables
+-- *******************
+local torchX			-- Counter for torches
+local movesDone = {}	-- Table to remember steps taken when getting ores
+
+function checkTorches()
+	-- lazy instantiation
+	if (torchX == nil) then
+		torchX = 0
+	end
+
+	if (torchX~=9) then
+		if (torchX==0) then
+			turtle.select(SLOTS.TORCHES)
+			if (turtle.detectDown() == false) then
+				turtle.placeDown()
+			else
+				torchX=-1
+			end
+		end
+		torchX=torchX+1
+	else
+		torchX=0
+	end
+end
+
+function dig()
+	-- loop for falling gravel
+	while(turtle.detect() == true) do
+		turtle.dig()
+	end
+	checkTorches()
+end
+
+function digUp()
+	-- loop for falling gravel
+	while(turtle.detectUp() == true) do
+		turtle.digUp()
+	end
+	turtle.up()
+	checkTorches()
+end
+
+function digDown()
+	turtle.digDown()
+	turtle.down()
+	checkTorches()
+end
+
+function forward()
+	-- checkFuel
+	turtle.forward()
+	checkTorches()
+end
+
+function digForward()
+	dig()
+	forward()
+end
+
+function digLeft()
+	turtle.turnLeft()
+	dig()
+	forward()
+end
+
+function digRight()
+	turtle.turnRight()
+	dig()
+	forward()
+end
+
+function straightLine(length)
+	for i=1, length do
+		dig()
+		forward()
+		getOres()
+	end
+end
+
+
+function digBranch(length)
+	-- dig bottom row
+	for i=1, length do
+		dig()
+		forward()
+		getOres()
+	end
+	-- move to top row and turn around
+	digUp()
+	getOres()
+	turtle.turnLeft()
+	turtle.turnLeft()
+	-- dig top row
+	for i=1, length do
+		dig()
+		forward()
+		getOres()
+	end
+end
+
+
+function isBlock(direction)
+	local flag
+
+	-- assume the next function isOre turns already the turtle
+	if (direction == DIRECTION.FORWARD) then
+		flag = turtle.detect()
+	elseif (direction == DIRECTION.LEFT) then
+		flag = turtle.detect()
+	elseif (direction == DIRECTION.RIGHT) then
+		flag = turtle.detect()
+	elseif (direction == DIRECTION.UP) then
+		flag = turtle.detectUp()
+	elseif (direction == DIRECTION.DOWN) then
+		flag = turtle.detectDown()
+	end
+	
+	return flag
+end
+
+-- *******************
+-- * Check resources
+-- *******************
+-- turtle.compare()	// Compares block in current slot with block in front
+-- table.insert (list, value)
+-- Inserts value in list at last position
+-- table.remove (list [, pos])
+-- Remove value in list at last position
+
+-- Check if block is different from our inventory
+function isOre(direction)
+	local flag = true
+
+	-- position turtle	
+	if (direction == DIRECTION.LEFT) then
+		turtle.turnLeft()
+	elseif (direction == DIRECTION.RIGHT) then
+		turtle.turnRight()
+	end
+	
+	
+	if (isBlock(direction)) then
+		-- loop slots
+		for i=BLOCKS.START, BLOCKS.END do
+			turtle.select(i)
+			
+			if (direction == DIRECTION.UP) then
+				if turtle.compareUp() then	
+					flag = false
+				end
+			elseif (direction == DIRECTION.DOWN) then
+				if turtle.compareDown() then	
+					flag = false
+				end
+			else
+				if turtle.compare() then	
+					flag = false
+				end
+			end
+		end
+	else
+		flag = false
+	end
+	
+	-- move turtle back to original position
+	if (direction == DIRECTION.LEFT) then
+		turtle.turnRight()
+	elseif (direction == DIRECTION.RIGHT) then
+		turtle.turnLeft()
+	end
+	
+	return flag
+end
+
+-- This function is called from straightLine
+-- At the end, turtle should return to the start
+function getOres()
+	if (isOre(DIRECTION.LEFT)) then
+		print("Ore on my left!")
+		digLeft()
+		table.insert(movesDone, DIRECTION.LEFT)
+		getOres()
+	elseif (isOre(DIRECTION.RIGHT)) then
+		print("Ore on my right!")
+		digRight()
+		table.insert(movesDone, DIRECTION.RIGHT)
+		getOres()
+	elseif (isOre(DIRECTION.UP)) then
+		print("Ore above me!")
+		digUp()
+		table.insert(movesDone, DIRECTION.UP)
+		getOres()
+	elseif (isOre(DIRECTION.DOWN)) then
+		print("Ore above me!")
+		digDown()
+		table.insert(movesDone, DIRECTION.DOWN)
+		getOres()
+	elseif (isOre(DIRECTION.FORWARD)) then
+		print("Ore right in front!")
+		digForward()
+		table.insert(movesDone, DIRECTION.FORWARD)
+		getOres()
+	else
+		-- if nothing is found we'll move back until
+		-- we are at the starting point
+		if (table.getn(movesDone) ~= 0) then
+			local returnDirection
+			
+			--print("Current table: "..table.unpack(movesDone)) --attempt to call nil
+			print("Current table:")
+			table.foreach(movesDone,print)
+			
+			returnDirection = table.remove(movesDone)	--Returns the value of the removed element. (no position given, so last element)
+			print("Returning from direction: "..returnDirection)
+			
+			if (returnDirection == DIRECTION.LEFT) then
+				turtle.back()
+				turtle.turnRight()
+				getOres()
+			elseif (returnDirection == DIRECTION.RIGHT) then
+				turtle.back()
+				turtle.turnLeft()
+				getOres()
+			elseif (returnDirection == DIRECTION.FORWARD) then
+				turtle.back()
+				getOres()
+			elseif (returnDirection == DIRECTION.UP) then
+				turtle.down()
+				getOres()
+			elseif (returnDirection == DIRECTION.DOWN) then
+				turtle.up()
+				getOres()
+			end
+		end 
+	end
+end
+
+-- *******************
+-- * Main Program    *
+-- *******************
+digBranch(30)

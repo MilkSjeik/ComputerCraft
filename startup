@@ -1,0 +1,1 @@
+print(os.getComputerLabel().." has "..turtle.getFuelLevel().." fuel left.")
